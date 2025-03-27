@@ -1,0 +1,86 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local HIT_RANGE = 15 -- محدوده تشخیص توپ
+local PREDICTION_FACTOR = 0.35 -- ضریب پیش بینی مسیر
+local COOLDOWN = 0.1 -- زمان تاخیر بین هر چک
+local BALL_TAG = "Ball" -- تگ توپ‌ها در بازی
+
+local lastCheck = 0
+local ballCache = {}
+
+local function isBallValid(ball)
+    return ball:IsDescendantOf(workspace) and ball:FindFirstChild("Velocity")
+end
+
+local function calculateInterception(startPosition, targetPosition, targetVelocity, projectileSpeed)
+    local toTarget = targetPosition - startPosition
+    local a = targetVelocity:Dot(targetVelocity) - (projectileSpeed * projectileSpeed)
+    local b = 2 * targetVelocity:Dot(toTarget)
+    local c = toTarget:Dot(toTarget)
+
+    local disc = b * b - 4 * a * c
+    if disc < 0 then return nil end
+
+    local t1 = (-b - math.sqrt(disc)) / (2 * a)
+    local t2 = (-b + math.sqrt(disc)) / (2 * a)
+    local t = math.max(t1, t2)
+    
+    return targetPosition + targetVelocity * t
+end
+
+local function attackBall()
+    humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
+    task.wait(0.1)
+    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+end
+
+local function defenseLogic()
+    local now = tick()
+    if now - lastCheck < COOLDOWN then return end
+    lastCheck = now
+
+    local currentPosition = rootPart.Position
+
+    for _, ball in ipairs(workspace:GetChildren()) do
+        if ball:IsA("BasePart") and ball.Name == BALL_TAG and isBallValid(ball) then
+            local ballVelocity = ball.Velocity
+            local ballPosition = ball.Position
+            
+            local interceptPosition = calculateInterception(
+                currentPosition,
+                ballPosition,
+                ballVelocity.Magnitude * PREDICTION_FACTOR,
+                100
+            )
+
+            if interceptPosition then
+                local distance = (currentPosition - interceptPosition).Magnitude
+                local direction = (interceptPosition - currentPosition).Unit
+                local dotProduct = direction:Dot((ballPosition - currentPosition).Unit)
+
+                if distance < HIT_RANGE and dotProduct > 0.7 then
+                    attackBall()
+                    break
+                end
+            end
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(defenseLogic)
+
+-- ضد آنتی چیت (اختیاری)
+UserInputService.WindowFocusReleased:Connect(function()
+    RunService:UnbindFromRenderStep("BladeBallAI")
+end)
+
+UserInputService.WindowFocused:Connect(function()
+    RunService:BindToRenderStep("BladeBallAI", Enum.RenderPriority.First.Value, defenseLogic)
+end)
