@@ -1,0 +1,40 @@
+-- لیست کلمات فیلتر شده (برای تمرین)
+local bannedWords = {
+    ["fuck"] = true,
+    [""] = true,
+    ["stupid"] = true,
+    ["idiot"] = true
+}
+
+-- تابع تشخیص و تبدیل کلمه فیلتر شده به نسخه‌ی شبه‌خوانا
+function smartBypass(word)
+    local replacement = word
+    replacement = replacement:gsub("a", "@")
+    replacement = replacement:gsub("i", "1")
+    replacement = replacement:gsub("e", "3")
+    replacement = replacement:gsub("o", "0")
+    replacement = replacement:gsub("u", "v")
+    return replacement
+end
+
+-- تابع پردازش پیام و جایگزینی کلمات فیلتر شده
+function processMessage(message)
+    local words = string.split(message, " ")
+    for i, word in ipairs(words) do
+        local lower = word:lower():gsub("%p", "") -- حذف علائم نگارشی برای بررسی دقیق‌تر
+        if bannedWords[lower] then
+            words[i] = smartBypass(word)
+        end
+    end
+    return table.concat(words, " ")
+end
+
+-- ارسال پیام با تبدیل هوشمند (برای تمرین)
+local function sendMessage(message)
+    local finalMessage = processMessage(message)
+    print("[ارسال شده]:", finalMessage)
+    -- game.ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(finalMessage, "All")
+end
+
+-- مثال تمرینی
+sendMessage("You are such a badword but not ugly just a bit stupid")
